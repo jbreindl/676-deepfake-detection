@@ -1,9 +1,10 @@
 import cv2
 import cv2.ml as ml
 import numpy as np
-from prnu import extract_multiple_aligned
+import os
+from prnu import extract_multiple_aligned, extract_single
 
-def train(dirs: list, labels: list, t: int, kernel: int):
+def train(dirs: list, labels: list, t: int, kernel: int, term_criteria: tuple):
     """
     Train an SVM with the given parameters
     Params:
@@ -14,12 +15,28 @@ def train(dirs: list, labels: list, t: int, kernel: int):
     Returns:
         svm: trained svm
     """
-    svm =  ml.SVM_create()
+    # instantiate svm
+    svm = ml.SVM_create()
     svm.setType(t)
     svm.setKernel(kernel)
+    svm.setTermCritera(term_criteria)
+
+    # get PRNU data for all images in directory
+    prnus = list()
+    prnu_labels = list()
+    for directory, label in zip(dirs, labels):
+        imgs = list()
+        for fname in os.listdir():
+            img = cv2.imread(os.path.join(directory, fname), cv2.IMREAD_COLOR)
+            imgs.append(img)
+            prnu_labels.append(label)
+        prnu = extract_multiple_aligned(imgs)
+        prnus.extend(prnu)
+
+    svm.train(np.array(prnus), ml.ROW_SAMPLE, prnu_labels)
     return svm
 
-def classify(dir: list, svm) -> int:
+def classify(in_dir: str, svm) -> int:
     """
     Classify an image using a trained SVM
     Params:
@@ -28,4 +45,9 @@ def classify(dir: list, svm) -> int:
     Returns:
         label: returns label of the data
     """
-    return -1
+    labels = list()
+    for fname in os.listdir(in_dir):
+        img = cv2.imread(os.path.join(in_dir, fname))
+        prnu = extract_single(img)
+        labels.append(svm.classify(prnu))
+    return int(np.average(labels).round())
