@@ -1,10 +1,10 @@
 import cv2
-import cv2.ml as ml
 import numpy as np
 import os
-from prnu import extract_multiple_aligned, extract_single
+from sklearn.svm import SVR
+from prnu import extract_multiple_aligned
 
-def train(dirs: list, labels: list, t: int, kernel: int, term_criteria: tuple):
+def train(dirs: list, labels: list):
     """
     Train an SVM with the given parameters
     Params:
@@ -16,24 +16,20 @@ def train(dirs: list, labels: list, t: int, kernel: int, term_criteria: tuple):
         svm: trained svm
     """
     # instantiate svm
-    svm = ml.SVM_create()
-    svm.setType(t)
-    svm.setKernel(kernel)
-    svm.setTermCritera(term_criteria)
+    svm = SVR()
 
     # get PRNU data for all images in directory
     prnus = list()
-    prnu_labels = list()
-    for directory, label in zip(dirs, labels):
+    for directory in dirs:
         imgs = list()
-        for fname in os.listdir():
+        for fname in os.listdir(directory):
             img = cv2.imread(os.path.join(directory, fname), cv2.IMREAD_COLOR)
             imgs.append(img)
-            prnu_labels.append(label)
+        # get what is essentially PRNU data for whole video and prepare to classify
         prnu = extract_multiple_aligned(imgs)
-        prnus.extend(prnu)
-
-    svm.train(np.array(prnus), ml.ROW_SAMPLE, prnu_labels)
+        prnus.append(prnu.flatten())
+    prnus = np.array(prnus)
+    svm.fit(prnus, labels)
     return svm
 
 def classify(in_dir: str, svm) -> int:
@@ -45,9 +41,11 @@ def classify(in_dir: str, svm) -> int:
     Returns:
         label: returns label of the data
     """
-    labels = list()
+    images = list()
     for fname in os.listdir(in_dir):
         img = cv2.imread(os.path.join(in_dir, fname))
-        prnu = extract_single(img)
-        labels.append(svm.classify(prnu))
-    return int(np.average(labels).round())
+        images.append(img)
+    return svm.predict(extract_multiple_aligned(images))
+
+if __name__ == "__main__":
+    train(['preprocessed'], [1])
