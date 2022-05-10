@@ -45,7 +45,10 @@ def classify(in_dir: str, svm) -> int:
     for fname in os.listdir(in_dir):
         img = cv2.imread(os.path.join(in_dir, fname))
         images.append(img)
-    return svm.predict(extract_multiple_aligned(images).flatten())
+    prnus = extract_multiple_aligned(images)
+    prediction = svm.predict(prnus.reshape(1, -1))
+    return prediction
 
 if __name__ == "__main__":
-    train(['preprocessed'], [1])
+    trained = train(['preprocessed'], [1])
+    print(classify('preprocessed', trained))
